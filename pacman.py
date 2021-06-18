@@ -577,7 +577,8 @@ def readCommand(argv):
     noKeyboard = options.gameToReplay == None and (
         options.textGraphics or options.quietGraphics)
     pacmanType = loadAgent(options.pacman, noKeyboard)
-    if options.pacman == "PacmanDeepQAgent":
+    if options.pacman == "PacmanDeepQAgent" or \
+            options.pacman == "GraphicsDQNAgent":
         print("options.agentArgs", options.agentArgs)
         layout_str = "layout_input={}".format(options.layout)
         if options.agentArgs:
