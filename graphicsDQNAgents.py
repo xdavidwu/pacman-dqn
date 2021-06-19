@@ -105,10 +105,10 @@ class GraphicsDQNAgent(Agent):
             state_shape = [120, 136, 3]
             mem_size = 256
             batch_size = 64
-            learning_rate = 0.0005
-            epsilon = lambda episode, epoch: max(1 - epoch * 0.0003, 0.06)
+            learning_rate = 0.0001
+            epsilon = lambda episode, epoch: max(0.999 ** epoch, 0.06)
             x = tf.placeholder(tf.float32, [None] + state_shape)
-            conv1 = convolutionLayer(x, [15, 15, 3, 4], strides=[1, 15, 15, 1], padding='VALID')
+            conv1 = convolutionLayer(x / 255.0, [15, 15, 3, 4], strides=[1, 15, 15, 1], padding='VALID')
             conv_out = tf.reshape(conv1, [-1, 8 * 9 * 4])
             fc1 = fullyConnectedLayer(conv_out, [8 * 9 * 4, 64])
             y = layer(fc1, [64, 4])
@@ -133,7 +133,7 @@ class GraphicsDQNAgent(Agent):
         self.loss = tf.losses.mean_squared_error(self.yp, self.y)
         self.step = tf.train.AdamOptimizer(lr).minimize(self.loss)
         self.session = tf.Session(config=tf.ConfigProto(
-            gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.3)))
+            gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.2)))
         self.previous_state = None
         self.previous_score = None
         self.previous_action = None
