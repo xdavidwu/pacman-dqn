@@ -116,7 +116,7 @@ class GraphicsDQNAgent(Agent):
                     learning_rate, epsilon)
         raise Exception('Layout %s not implemeted.' % layout_input)
 
-    def __init__(self, layout_input):
+    def __init__(self, layout_input, eval_model=None):
         self.layout = layout_input
         (x, y, dis, state_shape, msize, bsize, lr, eps) = \
                 self.config(layout_input)
@@ -126,6 +126,7 @@ class GraphicsDQNAgent(Agent):
         self.epsilon = eps
         self.memory = ReplayMemory(msize, state_shape)
         self.batch_size = bsize
+        self.eval_model = eval_model
         self.x = x
         self.y = y
         self.yp = tf.placeholder(tf.float32, [None, 4])
@@ -136,7 +137,10 @@ class GraphicsDQNAgent(Agent):
         self.session = tf.Session(config=tf.ConfigProto(
             gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.2)))
         self.saver = tf.train.Saver(max_to_keep=0)
-        self.session.run(tf.global_variables_initializer())
+        if eval_model is None:
+            self.session.run(tf.global_variables_initializer())
+        else:
+            self.saver.restore(self.session, eval_model)
         self.previous_state = None
         self.previous_score = None
         self.previous_action = None
@@ -164,12 +168,13 @@ class GraphicsDQNAgent(Agent):
     def getAction(self, state):
         frame = getFrame()
         s = np.asarray(frame)
-        if self.previous_state is not None:
+        if self.previous_state is not None and self.eval_model is None:
             self.memory.push(self.previous_state, self.previous_action,
                     state.data.score - self.previous_score, s, False)
             self.train()
         a = None
-        if random.random() < self.epsilon(self.episode, self.epoch):
+        if random.random() < self.epsilon(self.episode, self.epoch) and \
+                self.eval_model is None:
             a = random.choice([0, 1, 2, 3])
         else:
             a = self.session.run(self.argmax_y, feed_dict={self.x: [s]})[0]
@@ -189,19 +194,21 @@ class GraphicsDQNAgent(Agent):
             adj_score -= 500
             adj_score += 64
             self.win_per100 += 1
-        self.memory.push(self.previous_state, self.previous_action,
-                adj_score - self.previous_score, self.previous_state,
-                True)
-        self.train()
-        print('episode : %d epoch: %d epsilon: %lf' % (self.episode, self.epoch,
-            self.epsilon(self.episode, self.epoch)), flush=True)
+        if self.eval_model is None:
+            self.memory.push(self.previous_state, self.previous_action,
+                    adj_score - self.previous_score, self.previous_state,
+                    True)
+            self.train()
+            print('episode : %d epoch: %d epsilon: %lf' % (self.episode,
+                self.epoch, self.epsilon(self.episode, self.epoch)), flush=True)
         if self.episode % 100 == 99:
             print('per100 wins: %d score: %lf' % (self.win_per100,
                 self.sum_per100 / 100), flush=True)
             self.win_per100 = 0
             self.sum_per100 = 0
-            self.saver.save(self.session, 'model-%s-%d' % \
-                    (self.layout, self.episode + 1))
+            if self.eval_model is None:
+                self.saver.save(self.session, 'model-%s-%d' % \
+                        (self.layout, self.episode + 1))
         self.episode += 1
         self.previous_state = None
         self.previous_score = None
