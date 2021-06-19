@@ -106,7 +106,7 @@ class GraphicsDQNAgent(Agent):
             mem_size = 256
             batch_size = 64
             learning_rate = 0.0005
-            epsilon = lambda episode, epoch: max(1 - epoch * 0.001, 0.05)
+            epsilon = lambda episode, epoch: max(1 - epoch * 0.0003, 0.06)
             x = tf.placeholder(tf.float32, [None] + state_shape)
             conv1 = convolutionLayer(x, [15, 15, 3, 4], strides=[1, 15, 15, 1], padding='VALID')
             conv_out = tf.reshape(conv1, [-1, 8 * 9 * 4])
@@ -132,11 +132,13 @@ class GraphicsDQNAgent(Agent):
         self.argmax_y = tf.argmax(y, 1)
         self.loss = tf.losses.mean_squared_error(self.yp, self.y)
         self.step = tf.train.AdamOptimizer(lr).minimize(self.loss)
-        self.session = tf.InteractiveSession()
+        self.session = tf.Session(config=tf.ConfigProto(
+            gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.3)))
         self.previous_state = None
         self.previous_score = None
         self.previous_action = None
-        tf.global_variables_initializer().run()
+        self.session.run(tf.global_variables_initializer())
+        self.win_per100 = 0
 
     def train(self):
         if not self.memory.is_full: return
@@ -152,7 +154,7 @@ class GraphicsDQNAgent(Agent):
 
         [_, loss] = self.session.run([self.step, self.loss], feed_dict={self.x: s, self.yp: q})
         self.epoch += 1
-        if self.epoch % 10 == 0:
+        if self.epoch % 32 == 0:
             print('loss: %lf' % loss)
             print('sample: %lf %lf %lf' % (q[0][a[0]], r[0], max_qp[0]))
 
@@ -179,12 +181,19 @@ class GraphicsDQNAgent(Agent):
         if state.isLose():
             adj_score += 500
             adj_score -= 64
+        elif state.isWin():
+            adj_score -= 500
+            adj_score += 64
+            self.win_per100 += 1
         self.memory.push(self.previous_state, self.previous_action,
                 adj_score - self.previous_score, self.previous_state,
                 True)
         self.train()
         print('epoch: %d' % self.epoch)
-        print('episode: %d' % self.episode)
+        print('episode: %d' % self.episode, flush=True)
+        if self.episode % 100 == 99:
+            print('per100 wins: %d' % self.win_per100)
+            self.win_per100 = 0
         self.episode += 1
         self.previous_state = None
         self.previous_score = None
