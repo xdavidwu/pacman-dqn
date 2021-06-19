@@ -14,7 +14,7 @@ tf.disable_v2_behavior()
 
 def getFrame():
         ps = graphicsUtils._canvas.postscript(
-                pagewidth=int(graphicsUtils._canvas['width']) / 2,
+                pagewidth=(int(graphicsUtils._canvas['width']) - 30) / 2,
                 width=int(graphicsUtils._canvas['width']) - 30,
                 height=int(graphicsUtils._canvas['height']) - 30 - 35,
                 x=15, y=15)
@@ -102,21 +102,22 @@ class GraphicsDQNAgent(Agent):
     def config(self, layout_input):
         if layout_input == 'mediumGrid':
             discount = 0.9
-            state_shape = [120, 136, 3]
+            state_shape = [106, 121, 3]
             mem_size = 256
             batch_size = 64
             learning_rate = 0.0001
             epsilon = lambda episode, epoch: max(0.999 ** epoch, 0.06)
             x = tf.placeholder(tf.float32, [None] + state_shape)
             conv1 = convolutionLayer(x / 255.0, [15, 15, 3, 4], strides=[1, 15, 15, 1], padding='VALID')
-            conv_out = tf.reshape(conv1, [-1, 8 * 9 * 4])
-            fc1 = fullyConnectedLayer(conv_out, [8 * 9 * 4, 64])
+            conv_out = tf.reshape(conv1, [-1, 7 * 8 * 4])
+            fc1 = fullyConnectedLayer(conv_out, [7 * 8 * 4, 64])
             y = layer(fc1, [64, 4])
             return (x, y, discount, state_shape, mem_size, batch_size,
                     learning_rate, epsilon)
         raise Exception('Layout %s not implemeted.' % layout_input)
 
     def __init__(self, layout_input):
+        self.layout = layout_input
         (x, y, dis, state_shape, msize, bsize, lr, eps) = \
                 self.config(layout_input)
         self.episode = 0
@@ -134,11 +135,13 @@ class GraphicsDQNAgent(Agent):
         self.step = tf.train.AdamOptimizer(lr).minimize(self.loss)
         self.session = tf.Session(config=tf.ConfigProto(
             gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.2)))
+        self.saver = tf.train.Saver(max_to_keep=0)
+        self.session.run(tf.global_variables_initializer())
         self.previous_state = None
         self.previous_score = None
         self.previous_action = None
-        self.session.run(tf.global_variables_initializer())
         self.win_per100 = 0
+        self.sum_per100 = 0
 
     def train(self):
         if not self.memory.is_full: return
@@ -177,6 +180,7 @@ class GraphicsDQNAgent(Agent):
 
     def final(self, state):
         # sp does not matter
+        self.sum_per100 += state.data.score
         adj_score = state.data.score
         if state.isLose():
             adj_score += 500
@@ -189,11 +193,15 @@ class GraphicsDQNAgent(Agent):
                 adj_score - self.previous_score, self.previous_state,
                 True)
         self.train()
-        print('epoch: %d' % self.epoch)
-        print('episode: %d' % self.episode, flush=True)
+        print('episode : %d epoch: %d epsilon: %lf' % (self.episode, self.epoch,
+            self.epsilon(self.episode, self.epoch)), flush=True)
         if self.episode % 100 == 99:
-            print('per100 wins: %d' % self.win_per100)
+            print('per100 wins: %d score: %lf' % (self.win_per100,
+                self.sum_per100 / 100), flush=True)
             self.win_per100 = 0
+            self.sum_per100 = 0
+            self.saver.save(self.session, 'model-%s-%d' % \
+                    (self.layout, self.episode + 1))
         self.episode += 1
         self.previous_state = None
         self.previous_score = None
