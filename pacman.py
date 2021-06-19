@@ -582,7 +582,7 @@ def readCommand(argv):
         print("options.agentArgs", options.agentArgs)
         layout_str = "layout_input={}".format(options.layout)
         if options.agentArgs:
-            options.agentArgs += layout_str
+            options.agentArgs += ',' + layout_str
         else:
             options.agentArgs = layout_str
     agentOpts = parseAgentArgs(options.agentArgs)
