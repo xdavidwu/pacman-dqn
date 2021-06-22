@@ -114,6 +114,20 @@ class GraphicsDQNAgent(Agent):
             y = layer(fc1, [64, 4])
             return (x, y, discount, state_shape, mem_size, batch_size,
                     learning_rate, epsilon)
+        elif layout_input == 'smallClassic':
+            discount = 0.9
+            state_shape = [106, 301, 3]
+            mem_size = 8192
+            batch_size = 64
+            learning_rate = 0.0001
+            epsilon = lambda episode, epoch: max(0.999 ** epoch, 0.06)
+            x = tf.placeholder(tf.float32, [None] + state_shape)
+            conv1 = convolutionLayer(x / 255.0, [15, 15, 3, 8], strides=[1, 15, 15, 1], padding='VALID')
+            conv_out = tf.reshape(conv1, [-1, 7 * 20 * 8])
+            fc1 = fullyConnectedLayer(conv_out, [7 * 20 * 8, 256])
+            y = layer(fc1, [256, 4])
+            return (x, y, discount, state_shape, mem_size, batch_size,
+                    learning_rate, epsilon)
         raise Exception('Layout %s not implemeted.' % layout_input)
 
     def __init__(self, layout_input, eval_model=None):
