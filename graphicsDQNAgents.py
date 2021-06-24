@@ -117,10 +117,10 @@ class GraphicsDQNAgent(Agent):
         elif layout_input == 'smallClassic':
             discount = 0.9
             state_shape = [106, 301, 3]
-            mem_size = 8192
+            mem_size = 32768
             batch_size = 64
             learning_rate = 0.0001
-            epsilon = lambda episode, epoch: max(0.999 ** epoch, 0.06)
+            epsilon = lambda episode, epoch: max(0.999 ** epoch, 0.07)
             x = tf.placeholder(tf.float32, [None] + state_shape)
             conv1 = convolutionLayer(x / 255.0, [15, 15, 3, 8], strides=[1, 15, 15, 1], padding='VALID')
             conv_out = tf.reshape(conv1, [-1, 7 * 20 * 8])
@@ -149,7 +149,7 @@ class GraphicsDQNAgent(Agent):
         self.loss = tf.losses.mean_squared_error(self.yp, self.y)
         self.step = tf.train.AdamOptimizer(lr).minimize(self.loss)
         self.session = tf.Session(config=tf.ConfigProto(
-            gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.2)))
+            gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=0.5)))
         self.saver = tf.train.Saver(max_to_keep=0)
         if eval_model is None:
             self.session.run(tf.global_variables_initializer())
